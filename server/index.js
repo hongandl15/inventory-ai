@@ -111,6 +111,7 @@ app.get('/api/transactions', (req, res) => {
 // AI: Natural language query (placeholder)
 import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
 app.post('/api/ai', async (req, res) => {
   const { query } = req.body;
   try {

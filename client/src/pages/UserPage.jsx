@@ -7,11 +7,11 @@ export default function UserPage() {
   const [user, setUser] = useState(null);
 
   const register = () => {
-     axios.post('http://localhost:3001/api/users/register', { username, password }).then(() => alert('Đăng ký thành công!'));
+     axios.post('https://inventory-ai-4pfd.onrender.com/api/users/register', { username, password }).then(() => alert('Đăng ký thành công!'));
   };
 
   const login = () => {
-     axios.post('http://localhost:3001/api/users/login', { username, password }).then(res => setUser(res.data)).catch(() => alert('Đăng nhập thất bại'));
+     axios.post('https://inventory-ai-4pfd.onrender.com/api/users/login', { username, password }).then(res => setUser(res.data)).catch(() => alert('Đăng nhập thất bại'));
   };
 
   return (

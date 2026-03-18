@@ -12,11 +12,11 @@ export default function ReportPage() {
   const [sortDir, setSortDir] = useState('asc');
 
   const getReport = () => {
-     axios.get('http://localhost:3001/api/report/summary').then(res => setReport(res.data));
+     axios.get('https://inventory-ai-4pfd.onrender.com//api/report/summary').then(res => setReport(res.data));
   };
 
   const getTransReport = () => {
-     axios.get(`http://localhost:3001/api/report/transactions?from=${fromDate}&to=${toDate}`).then(res => setTransReport(res.data));
+     axios.get(`https://inventory-ai-4pfd.onrender.com/api/report/transactions?from=${fromDate}&to=${toDate}`).then(res => setTransReport(res.data));
   };
 
   // Lọc và sắp xếp tồn kho

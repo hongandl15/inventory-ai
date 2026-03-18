@@ -16,15 +16,15 @@ export default function ProductPage() {
 
 
   useEffect(() => {
-    axios.get('http://localhost:3001/api/products').then(res => setProducts(res.data));
+    axios.get('https://inventory-ai-4pfd.onrender.com//api/products').then(res => setProducts(res.data));
   }, []);
 
   const refreshProducts = () => {
-    axios.get('http://localhost:3001/api/products').then(res => setProducts(res.data));
+    axios.get('https://inventory-ai-4pfd.onrender.com//api/products').then(res => setProducts(res.data));
   };
 
   const addProduct = () => {
-    axios.post('http://localhost:3001/api/products', { name, sku, quantity }).then(() => {
+    axios.post('https://inventory-ai-4pfd.onrender.com/api/products', { name, sku, quantity }).then(() => {
       refreshProducts();
       setName(''); setSku(''); setQuantity(0);
     });
@@ -37,14 +37,14 @@ export default function ProductPage() {
   };
 
   const saveEditProduct = () => {
-    axios.put(`http://localhost:3001/api/products/${editId}/edit`, { name: editName, sku: editSku }).then(() => {
+    axios.put(`https://inventory-ai-4pfd.onrender.com/api/products/${editId}/edit`, { name: editName, sku: editSku }).then(() => {
       refreshProducts();
       setEditId(null);
     });
   };
 
   const deleteProduct = (id) => {
-    axios.delete(`http://localhost:3001/api/products/${id}`).then(() => refreshProducts());
+    axios.delete(`https://inventory-ai-4pfd.onrender.com/api/products/${id}`).then(() => refreshProducts());
   };
 
   // Lọc và sắp xếp

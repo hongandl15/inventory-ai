@@ -1,0 +1,10 @@
+{
+  "files": {
+    "main.js": "/inventory-ai/static/js/main.6ceca0a3.js",
+    "index.html": "/inventory-ai/index.html",
+    "main.6ceca0a3.js.map": "/inventory-ai/static/js/main.6ceca0a3.js.map"
+  },
+  "entrypoints": [
+    "static/js/main.6ceca0a3.js"
+  ]
+}

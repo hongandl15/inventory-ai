@@ -13,11 +13,11 @@ export default function TransactionPage() {
   const [sortDir, setSortDir] = useState('desc');
 
   useEffect(() => {
-     axios.get('http://localhost:3001/api/products').then(res => setProducts(res.data));
+     axios.get('https://inventory-ai-4pfd.onrender.com//api/products').then(res => setProducts(res.data));
   }, []);
 
   const handleInOut = () => {
-     axios.post('http://localhost:3001/api/transactions', {
+     axios.post('https://inventory-ai-4pfd.onrender.com/api/transactions', {
       product_id: inOutProduct,
       type: inOutType,
       amount: inOutAmount
@@ -28,7 +28,7 @@ export default function TransactionPage() {
   };
 
   const showHistory = (id) => {
-     axios.get(`http://localhost:3001/api/transactions/${id}`).then(res => setHistory(res.data));
+     axios.get(`https://inventory-ai-4pfd.onrender.com/api/transactions/${id}`).then(res => setHistory(res.data));
   };
 
   // Lọc và sắp xếp
