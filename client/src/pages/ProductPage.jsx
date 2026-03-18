@@ -16,11 +16,11 @@ export default function ProductPage() {
 
 
   useEffect(() => {
-    axios.get('https://inventory-ai-4pfd.onrender.com//api/products').then(res => setProducts(res.data));
+    axios.get('https://inventory-ai-4pfd.onrender.com/api/products').then(res => setProducts(res.data));
   }, []);
 
   const refreshProducts = () => {
-    axios.get('https://inventory-ai-4pfd.onrender.com//api/products').then(res => setProducts(res.data));
+    axios.get('https://inventory-ai-4pfd.onrender.com/api/products').then(res => setProducts(res.data));
   };
 
   const addProduct = () => {

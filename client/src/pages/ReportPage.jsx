@@ -12,7 +12,7 @@ export default function ReportPage() {
   const [sortDir, setSortDir] = useState('asc');
 
   const getReport = () => {
-     axios.get('https://inventory-ai-4pfd.onrender.com//api/report/summary').then(res => setReport(res.data));
+     axios.get('https://inventory-ai-4pfd.onrender.com/api/report/summary').then(res => setReport(res.data));
   };
 
   const getTransReport = () => {

@@ -13,7 +13,7 @@ export default function TransactionPage() {
   const [sortDir, setSortDir] = useState('desc');
 
   useEffect(() => {
-     axios.get('https://inventory-ai-4pfd.onrender.com//api/products').then(res => setProducts(res.data));
+     axios.get('https://inventory-ai-4pfd.onrender.com/api/products').then(res => setProducts(res.data));
   }, []);
 
   const handleInOut = () => {
