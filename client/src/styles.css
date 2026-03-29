@@ -33,7 +33,7 @@
 .nav-link:hover { transform: translateY(-1px); color: var(--primary); background: rgba(11,94,215,0.04); }
 .nav-link.active { background: var(--primary); color: #fff; box-shadow: 0 6px 20px rgba(11,94,215,0.08); }
 
-.app-header .ai-input { min-width:340px; max-width:420px }
+.app-header .ai-input { flex: 1 1 auto; min-width:0; max-width: none }
 .ai-input input { border-radius:8px; }
 
 @media (max-width: 900px) {
@@ -47,8 +47,22 @@
 .app-nav a { color: var(--muted); font-weight:600; text-decoration:none; padding:8px 12px; border-radius:6px }
 .app-nav a:hover { background: rgba(11,94,215,0.06); color: var(--primary) }
 
-.ai-input { display:flex; align-items:center; gap:8px; min-width:420px }
-.ai-input input { flex:1; padding:10px 14px; border-radius:8px; border:1px solid #e3e8ef; font-size:14px }
+.header-actions { display:flex; align-items:center; gap:12px }
+.ai-input { display:flex; align-items:center; gap:8px; flex:1 1 auto; min-width:0 }
+.ai-input input { width:100%; flex:1; padding:10px 14px; border-radius:8px; border:1px solid #e3e8ef; font-size:14px }
+
+/* Large standalone AI panel */
+.ai-panel { margin: 18px 0; padding: 16px; border-radius: 10px; background: var(--card); box-shadow: 0 6px 20px rgba(11,94,215,0.04); }
+.ai-panel { margin: 18px 0; padding: 18px; border-radius: 12px; background: linear-gradient(180deg, #ffffff, #fbfdff); box-shadow: 0 8px 30px rgba(11,94,215,0.06); border: 1px solid rgba(11,94,215,0.04) }
+.ai-panel h3 { margin: 0 0 6px 0; font-size:18px; color: #122034; display:flex; align-items:center; gap:10px }
+.ai-sub { color: var(--muted); font-size:13px; margin-bottom:10px }
+.ai-panel textarea { width:100%; box-sizing:border-box; padding:14px; border-radius:10px; border:1px solid #e6eef8; font-size:14px; resize:vertical; background: #fcfdff; box-shadow: 0 4px 18px rgba(16,52,86,0.03) }
+.ai-actions { display:flex; gap:8px; margin-top:12px; justify-content:flex-end }
+.ai-actions .button { background: transparent; border: 1px solid rgba(16,52,86,0.06); padding:8px 12px; border-radius:8px }
+.ai-actions .button-primary { padding:8px 14px; border-radius:8px; box-shadow: 0 6px 18px rgba(11,94,215,0.08); background: linear-gradient(180deg,var(--primary),#084db5); }
+.ai-result { margin-top:12px; padding:12px; border-radius:8px; background: linear-gradient(180deg,#fcfdff,#ffffff); border-left:4px solid rgba(11,94,215,0.14) }
+.ai-result p, .ai-result ul { color: #213246 }
+.ai-result { white-space: pre-wrap }
 .button-primary { background: var(--primary); color:#fff; border:none; border-radius:6px; padding:8px 14px; font-weight:600 }
 
 .ai-result { background: var(--card); padding:12px; border-radius:8px; margin-bottom:16px; box-shadow: 0 2px 12px rgba(0,0,0,0.04) }

@@ -31,9 +31,11 @@ export default function ReportPage() {
       });
     };
 
-    // load warehouses for filtering
+    // load warehouses for filtering and auto-load inventory report on mount
     React.useEffect(()=>{
       axios.get(`${API_BASE}/api/warehouses`).then(res => setWarehouses(res.data)).catch(()=>{});
+      // auto-fetch report when opening the page
+      getReport();
     },[]);
 
   // Lọc và sắp xếp tồn kho

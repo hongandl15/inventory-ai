@@ -58,32 +58,32 @@ export default function AIPage() {
   const chartData = products.slice().sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0)).slice(0, 10).map(p => ({ name: p.name, quantity: Number(p.quantity) || 0 }));
 
   return (
-    <div className="card">
-      <h2>Thống kê</h2>
+    <div style={{ background: '#fff', borderRadius: 8, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px #0001' }}>
+      <h2 style={{ color: '#0078d4', marginBottom: 16 }}>Thống kê</h2>
       {/* Dashboard section */}
-      <div style={{ display: 'flex', gap: 24, marginBottom: 20 }}>
-        <div className="card" style={{ background: '#eaf1fb', minWidth: 160, textAlign: 'center' }}>
-          <div style={{ color: 'var(--primary)', fontWeight: 600, fontSize: 16 }}>Tồn kho thấp</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{dashboard[0]?.value || 0}</div>
+      <div style={{ display: 'flex', gap: 32, marginBottom: 32 }}>
+        <div style={{ background: '#eaf1fb', borderRadius: 8, padding: 18, minWidth: 180, textAlign: 'center', boxShadow: '0 2px 8px #0001' }}>
+          <div style={{ color: '#0078d4', fontWeight: 600, fontSize: 18 }}>Tồn kho thấp</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard[0]?.value || 0}</div>
         </div>
-        <div className="card" style={{ background: '#eaf1fb', minWidth: 160, textAlign: 'center' }}>
-          <div style={{ color: 'var(--success)', fontWeight: 600, fontSize: 16 }}>Tồn kho đủ</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{dashboard[1]?.value || 0}</div>
+        <div style={{ background: '#eaf1fb', borderRadius: 8, padding: 18, minWidth: 180, textAlign: 'center', boxShadow: '0 2px 8px #0001' }}>
+          <div style={{ color: '#28a745', fontWeight: 600, fontSize: 18 }}>Tồn kho đủ</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard[1]?.value || 0}</div>
         </div>
-        <div className="card" style={{ background: '#eaf1fb', minWidth: 160, textAlign: 'center' }}>
-          <div style={{ color: '#ffc107', fontWeight: 600, fontSize: 16 }}>Tồn kho cao</div>
-          <div style={{ fontSize: 24, fontWeight: 700 }}>{dashboard[2]?.value || 0}</div>
+        <div style={{ background: '#eaf1fb', borderRadius: 8, padding: 18, minWidth: 180, textAlign: 'center', boxShadow: '0 2px 8px #0001' }}>
+          <div style={{ color: '#ffc107', fontWeight: 600, fontSize: 18 }}>Tồn kho cao</div>
+          <div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard[2]?.value || 0}</div>
         </div>
       </div>
       <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 16 }}>
-        <h3>Biểu đồ tồn kho</h3>
+        <h3 style={{ margin: '6px 0 10px', color: '#0078d4' }}>Biểu đồ tồn kho</h3>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <div style={{ background: '#eaf1fb', padding: 10, borderRadius: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--primary)' }}>Tồn kho thấp</div>
+            <div style={{ fontSize: 12, color: '#0078d4' }}>Tồn kho thấp</div>
             <div style={{ fontWeight: 700 }}>{dashboard[0]?.value || 0}</div>
           </div>
           <div style={{ background: '#eaf1fb', padding: 10, borderRadius: 6 }}>
-            <div style={{ fontSize: 12, color: 'var(--success)' }}>Tồn kho đủ</div>
+            <div style={{ fontSize: 12, color: '#28a745' }}>Tồn kho đủ</div>
             <div style={{ fontWeight: 700 }}>{dashboard[1]?.value || 0}</div>
           </div>
           <div style={{ background: '#eaf1fb', padding: 10, borderRadius: 6 }}>
@@ -91,14 +91,14 @@ export default function AIPage() {
             <div style={{ fontWeight: 700 }}>{dashboard[2]?.value || 0}</div>
           </div>
           <div style={{ marginLeft: 'auto' }}>
-            <Link to="/charts"><button className="button button-primary">Xem biểu đồ đầy đủ</button></Link>
+            <Link to="/charts"><button style={{ background: '#0078d4', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 6, fontWeight: 600 }}>Xem biểu đồ đầy đủ</button></Link>
           </div>
         </div>
       </div>
-      <h2>Truy vấn AI</h2>
+      <h2 style={{ color: '#0078d4', marginTop: 32 }}>Truy vấn AI</h2>
       <input style={{ width: '100%', padding: 8, borderRadius: 4, border: '1px solid #d0d7de', marginBottom: 8 }} placeholder="Hỏi về tồn kho..." value={query} onChange={e => setQuery(e.target.value)} />
-      <button className="button button-primary" onClick={askAI}>Gửi AI</button>
-      <div className="ai-result" style={{ marginTop: 10 }}>{aiResult}</div>
+      <button style={{ background: '#0078d4', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', fontWeight: 600 }} onClick={askAI}>Gửi AI</button>
+      <div style={{ marginTop: 10, background: '#eaf1fb', padding: 12, borderRadius: 4, minHeight: 40, whiteSpace: 'pre-wrap' }}>{aiResult}</div>
     </div>
   );
 }

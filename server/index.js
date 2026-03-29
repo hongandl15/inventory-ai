@@ -5,7 +5,15 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { seed } from './seed.js';
+// AI: Natural language query (placeholder)
+import OpenAI from 'openai';
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // import { Configuration, OpenAIApi } from 'openai'; // Uncomment when API key is set
+
+// const configuration = new Configuration({
+//   apiKey: process.env.OPENAI_API_KEY
+// });
+// const openai = new OpenAIApi(configuration);
 
 const app = express();
 app.use(cors());
@@ -261,11 +269,9 @@ app.get('/api/transactions', (req, res) => {
   });
 });
 
-// AI: Natural language query (placeholder)
-import OpenAI from 'openai';
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-app.post('/api/ai', async (req, res) => {
+
+app.post('/api/ai/test', async (req, res) => {
   const { query } = req.body;
   try {
     const response = await openai.chat.completions.create({
@@ -361,29 +367,52 @@ app.get('/api/user/warehouses', (req, res) => {
   });
 });
 
-// RAG Chatbot endpoint
-app.post('/api/rag', async (req, res) => {
-  const { query } = req.body;
-  db.all('SELECT * FROM products', async (err, products) => {
-    if (err) return res.status(500).json({ error: err.message });
-    db.all('SELECT * FROM transactions ORDER BY date DESC LIMIT 20', async (err2, transactions) => {
-      if (err2) return res.status(500).json({ error: err2.message });
-      const context = `Products: ${JSON.stringify(products)}\nTransactions: ${JSON.stringify(transactions)}`;
-      try {
-        const response = await openai.chat.completions.create({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: 'You are an inventory assistant. Use the provided context to answer.' },
-            { role: 'user', content: query },
-            { role: 'system', content: context }
-          ]
-        });
-        return res.json({ result: response.choices[0].message.content });
-      } catch (err) {
-        res.status(500).json({ error: err.message });
-      }
+// RAG Chatbot endpoint — gather DB context and answer with OpenAI
+app.post('/api/ai', async (req, res) => {
+  const { query } = req.body || {};
+  try {
+    // gather relevant data from DB
+    const products = await allAsync('SELECT id, name, sku, quantity, warehouse_id FROM products');
+    const transactions = await allAsync('SELECT id, product_id, type, amount, date, warehouse_id FROM transactions ORDER BY date DESC LIMIT 50');
+    const sales = await allAsync('SELECT id, product_id, quantity, unit_price, total, date, warehouse_id FROM sales ORDER BY date DESC LIMIT 50');
+    const warehouses = await allAsync('SELECT id, name, location FROM warehouses');
+
+    // build lightweight summaries to keep prompt size reasonable
+    const whMap = Object.fromEntries(warehouses.map(w => [w.id, w.name]));
+
+    const productSummaries = products.map(p => `${p.id}|${p.name}|sku:${p.sku}|qty:${p.quantity}|wh:${whMap[p.warehouse_id] || p.warehouse_id || 'unassigned'}`);
+    const recentTx = transactions.map(t => `${t.date} - ${t.type.toUpperCase()} product:${t.product_id} amount:${t.amount} wh:${whMap[t.warehouse_id] || t.warehouse_id || '—'}`);
+    const recentSales = sales.map(s => `${s.date} - sale product:${s.product_id} qty:${s.quantity} total:${s.total} wh:${whMap[s.warehouse_id] || s.warehouse_id || '—'}`);
+
+    // Compose context text
+    const contextParts = [];
+    contextParts.push(`Warehouses (${warehouses.length}):\n${warehouses.map(w=>`- ${w.id}: ${w.name} (${w.location||''})`).join('\n')}`);
+    contextParts.push(`Products (${products.length}):\n${productSummaries.slice(0,200).join('\n')}`);
+    if (products.length > 200) contextParts.push(`...and ${products.length - 200} more products`);
+    contextParts.push(`Recent Transactions (${transactions.length}):\n${recentTx.join('\n')}`);
+    contextParts.push(`Recent Sales (${sales.length}):\n${recentSales.join('\n')}`);
+
+    const context = contextParts.join('\n\n');
+
+    // Query the model with the assembled context and request nicely formatted text in Vietnamese
+    const systemPrompt = `Bạn là trợ lý quản lý kho. Sử dụng thông tin trong phần Context để trả lời chính xác câu hỏi của người dùng và trích dẫn tên/ID khi cần. Nếu câu trả lời cần số liệu hiện tại, hãy ưu tiên dữ liệu đã cung cấp. Chỉ sử dụng duy nhất tiếng Việt trong toàn bộ phản hồi (không dùng ngôn ngữ khác). Viết câu ngắn gọn, xuống dòng giữa các đoạn, và dùng danh sách gạch đầu dòng khi hữu ích. KHÔNG trả về JSON — chỉ trả về văn bản thuần.`;
+    const userPrompt = `Câu hỏi của người dùng: ${query}\n\nContext:\n${context}\n\nVui lòng đưa ra một tóm tắt ngắn (1-2 câu) trước, sau đó nêu các chi tiết liên quan hoặc các bước thực hiện, định dạng có xuống dòng và các gạch đầu dòng nếu cần. Trả lời hoàn toàn bằng tiếng Việt.`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 800
     });
-  });
+
+    const answer = response?.choices?.[0]?.message?.content || '';
+    res.json({ result: answer });
+  } catch (err) {
+    console.error('RAG error:', err?.message || err);
+    res.status(500).json({ error: err.message || String(err) });
+  }
 });
 
 // Run migrations then seed on startup (non-fatal)

@@ -25,6 +25,25 @@ function App() {
     }).catch(() => setAiResult('Lỗi khi gọi AI')).finally(() => setAiLoading(false));
   };
 
+  const renderAiResult = (text) => {
+    if (!text) return null;
+    const blocks = text.split(/\n\s*\n/);
+    return blocks.map((blk, i) => {
+      const lines = blk.split('\n').map(l => l.trim()).filter(Boolean);
+      const isList = lines.length > 0 && lines.every(l => l.startsWith('- '));
+      if (isList) {
+        return (
+          <ul key={i} style={{ margin: '8px 0 8px 20px' }}>
+            {lines.map((ln, idx) => <li key={idx}>{ln.replace(/^-\s*/, '')}</li>)}
+          </ul>
+        );
+      }
+      return (
+        <p key={i} style={{ margin: '8px 0', lineHeight: 1.5 }}>{lines.map((ln, idx) => <span key={idx}>{ln}{idx < lines.length - 1 && <br />}</span>)}</p>
+      );
+    });
+  };
+
   return (
     <BrowserRouter>
       <div className="app-container">
@@ -44,14 +63,9 @@ function App() {
             <NavLink to="/charts" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Biểu đồ</NavLink>
             <NavLink to="/revenue" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Doanh thu</NavLink>
             <NavLink to="/warehouses" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Kho</NavLink>
-            <NavLink to="/user" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Người dùng</NavLink>
           </nav>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div className="ai-input">
-              <input placeholder="Hỏi AI về tồn kho..." value={aiQuery} onChange={e => setAiQuery(e.target.value)} />
-              <button onClick={askAI} className="button-primary">{aiLoading ? 'Đang...' : 'Hỏi AI'}</button>
-            </div>
+          <div className="header-actions">
             <div className="auth-area">
               <NavLink to="/user" className="auth-button">Đăng nhập</NavLink>
             </div>
@@ -60,12 +74,22 @@ function App() {
 
         <div className="banner" />
 
-        {aiResult ? (
-          <div className="ai-result">
-            <strong>Kết quả AI:</strong>
-            <div style={{ marginTop: 8, color: '#2d3a4a' }}>{aiResult}</div>
+        <div className="ai-panel card">
+          <h3>Hỏi AI</h3>
+          <div className="ai-sub">Gợi ý: hỏi về tồn kho, báo cáo theo kho, hoặc xu hướng doanh thu.</div>
+          <textarea placeholder="Nhập câu hỏi về tồn kho, báo cáo, doanh thu..." value={aiQuery} onChange={e => setAiQuery(e.target.value)} rows={5} />
+          <div className="ai-actions">
+            <button onClick={askAI} className="button-primary">{aiLoading ? 'Đang...' : 'Hỏi AI'}</button>
+            <button onClick={() => { setAiQuery(''); setAiResult(''); }} className="button">Xóa</button>
           </div>
-        ) : null}
+
+          {aiResult ? (
+            <div className="ai-result" style={{ marginTop: 12 }}>
+              <strong>Kết quả AI:</strong>
+              <div style={{ marginTop: 8, color: '#2d3a4a' }}>{renderAiResult(aiResult)}</div>
+            </div>
+          ) : null}
+        </div>
 
         <Routes>
           <Route path="/" element={<ProductPage />} />
