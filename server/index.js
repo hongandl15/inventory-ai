@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS user_warehouses (
   warehouse_id INTEGER,
   PRIMARY KEY(user_id, warehouse_id)
 );
+CREATE TABLE IF NOT EXISTS transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  product_id_from INTEGER,
+  product_id_to INTEGER,
+  quantity INTEGER,
+  date TEXT,
+  from_warehouse_id INTEGER,
+  to_warehouse_id INTEGER
+);
 `;
 db.exec(initSQL);
 
@@ -81,6 +90,12 @@ function allAsync(sql, params = []) {
   return new Promise((resolve, reject) => db.all(sql, params, (err, rows) => {
     if (err) return reject(err);
     resolve(rows);
+  }));
+}
+function getAsync(sql, params = []) {
+  return new Promise((resolve, reject) => db.get(sql, params, (err, row) => {
+    if (err) return reject(err);
+    resolve(row);
   }));
 }
 
@@ -346,6 +361,54 @@ app.get('/api/warehouses', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
+});
+
+// API: List transfers
+app.get('/api/transfers', async (req, res) => {
+  try {
+    const rows = await allAsync('SELECT t.*, pfrom.name as product_from_name, pto.name as product_to_name, wf.name as from_warehouse_name, wt.name as to_warehouse_name FROM transfers t LEFT JOIN products pfrom ON pfrom.id = t.product_id_from LEFT JOIN products pto ON pto.id = t.product_id_to LEFT JOIN warehouses wf ON wf.id = t.from_warehouse_id LEFT JOIN warehouses wt ON wt.id = t.to_warehouse_id ORDER BY t.date DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Transfer stock between warehouses
+app.post('/api/transfers', async (req, res) => {
+  const { product_id, to_warehouse_id, quantity } = req.body;
+  if (!product_id || !to_warehouse_id || !quantity) return res.status(400).json({ error: 'Missing fields' });
+  try {
+    const src = await getAsync('SELECT * FROM products WHERE id = ?', [product_id]);
+    if (!src) return res.status(404).json({ error: 'Source product not found' });
+    if ((src.quantity || 0) < Number(quantity)) return res.status(400).json({ error: 'Insufficient quantity in source' });
+    const fromWid = src.warehouse_id;
+    const date = new Date().toISOString();
+
+    // Deduct from source product
+    await runAsync('UPDATE products SET quantity = quantity - ? WHERE id = ?', [quantity, product_id]);
+
+    // Find destination product (same SKU) in target warehouse
+    let dest = await getAsync('SELECT * FROM products WHERE sku = ? AND warehouse_id = ?', [src.sku, to_warehouse_id]);
+    let destProductId;
+    if (dest) {
+      await runAsync('UPDATE products SET quantity = quantity + ? WHERE id = ?', [quantity, dest.id]);
+      destProductId = dest.id;
+    } else {
+      const ins = await runAsync('INSERT INTO products (name, sku, quantity, warehouse_id) VALUES (?, ?, ?, ?)', [src.name, src.sku, quantity, to_warehouse_id]);
+      destProductId = ins.lastID;
+    }
+
+    // Record transactions for audit
+    await runAsync('INSERT INTO transactions (product_id, type, amount, date, warehouse_id) VALUES (?, ?, ?, ?, ?)', [product_id, 'out', quantity, date, fromWid]);
+    await runAsync('INSERT INTO transactions (product_id, type, amount, date, warehouse_id) VALUES (?, ?, ?, ?, ?)', [destProductId, 'in', quantity, date, to_warehouse_id]);
+
+    // Record transfer
+    const t = await runAsync('INSERT INTO transfers (product_id_from, product_id_to, quantity, date, from_warehouse_id, to_warehouse_id) VALUES (?, ?, ?, ?, ?, ?)', [product_id, destProductId, quantity, date, fromWid, to_warehouse_id]);
+
+    res.json({ transferred: true, transfer_id: t.lastID });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post('/api/warehouses/:id/assign', (req, res) => {
