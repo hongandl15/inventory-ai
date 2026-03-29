@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { API_BASE } from '../config';
 import * as XLSX from 'xlsx';
 
 export default function ProductPage() {
   const [products, setProducts] = useState([]);
+  const [warehouses, setWarehouses] = useState([]);
+  const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [quantity, setQuantity] = useState(0);
@@ -16,15 +19,16 @@ export default function ProductPage() {
 
 
   useEffect(() => {
-    axios.get('https://inventory-ai-4pfd.onrender.com/api/products').then(res => setProducts(res.data));
+    axios.get(`${API_BASE}/api/products`).then(res => setProducts(res.data));
+    axios.get(`${API_BASE}/api/warehouses`).then(res => setWarehouses(res.data)).catch(()=>{});
   }, []);
 
   const refreshProducts = () => {
-    axios.get('https://inventory-ai-4pfd.onrender.com/api/products').then(res => setProducts(res.data));
+    axios.get(`${API_BASE}/api/products`).then(res => setProducts(res.data));
   };
 
   const addProduct = () => {
-    axios.post('https://inventory-ai-4pfd.onrender.com/api/products', { name, sku, quantity }).then(() => {
+    axios.post(`${API_BASE}/api/products`, { name, sku, quantity, warehouse_id: warehouseFilter === 'all' ? null : warehouseFilter }).then(() => {
       refreshProducts();
       setName(''); setSku(''); setQuantity(0);
     });
@@ -37,20 +41,20 @@ export default function ProductPage() {
   };
 
   const saveEditProduct = () => {
-    axios.put(`https://inventory-ai-4pfd.onrender.com/api/products/${editId}/edit`, { name: editName, sku: editSku }).then(() => {
+    axios.put(`${API_BASE}/api/products/${editId}/edit`, { name: editName, sku: editSku }).then(() => {
       refreshProducts();
       setEditId(null);
     });
   };
 
   const deleteProduct = (id) => {
-    axios.delete(`https://inventory-ai-4pfd.onrender.com/api/products/${id}`).then(() => refreshProducts());
+    axios.delete(`${API_BASE}/api/products/${id}`).then(() => refreshProducts());
   };
 
   // Lọc và sắp xếp
   const filtered = products.filter(p =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
+    (warehouseFilter === 'all' || String(p.warehouse_id) === String(warehouseFilter)) &&
+    (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
   );
   const sorted = [...filtered].sort((a, b) => {
     if (sortBy === 'quantity') {
@@ -75,6 +79,10 @@ export default function ProductPage() {
     <div style={{ background: 'linear-gradient(135deg,#f5f7fa 0%,#c3cfe2 100%)', borderRadius: 12, padding: 32, marginBottom: 32, boxShadow: '0 4px 24px #0002' }}>
       <h2 style={{ color: '#0078d4', marginBottom: 24, fontSize: 28, fontWeight: 700, letterSpacing: 1 }}>Quản lý sản phẩm</h2>
       <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+        <select value={warehouseFilter} onChange={e=>setWarehouseFilter(e.target.value)} style={{ width:160, padding:10, borderRadius:6, border:'1px solid #b0b8c1' }}>
+          <option value="all">Tất cả kho</option>
+          {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+        </select>
         <input style={{ flex: 2, padding: 10, borderRadius: 6, border: '1px solid #b0b8c1', fontSize: 16 }} placeholder="Tìm kiếm tên hoặc SKU..." value={search} onChange={e => setSearch(e.target.value)} />
         <input style={{ flex: 2, padding: 10, borderRadius: 6, border: '1px solid #b0b8c1', fontSize: 16 }} placeholder="Tên sản phẩm" value={name} onChange={e => setName(e.target.value)} />
         <input style={{ flex: 2, padding: 10, borderRadius: 6, border: '1px solid #b0b8c1', fontSize: 16 }} placeholder="SKU" value={sku} onChange={e => setSku(e.target.value)} />
@@ -82,38 +90,87 @@ export default function ProductPage() {
         <button style={{ background: '#0078d4', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 20px', fontWeight: 700, fontSize: 16 }} onClick={addProduct}>Thêm</button>
         <button style={{ background: '#28a745', color: '#fff', border: 'none', borderRadius: 6, padding: '10px 20px', fontWeight: 700, fontSize: 16 }} onClick={exportExcel}>Xuất Excel</button>
       </div>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px #0001' }}>
-        <thead style={{ background: '#eaf1fb' }}>
-          <tr>
-            <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('name'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Tên {sortBy === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
-            <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('sku'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>SKU {sortBy === 'sku' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
-            <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('quantity'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Số lượng {sortBy === 'quantity' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
-            <th style={{ padding: 12 }}>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map(p => (
-            <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={{ padding: 10 }}>{editId === p.id ? <input style={{ padding: 8, borderRadius: 4, border: '1px solid #d0d7de' }} value={editName} onChange={e => setEditName(e.target.value)} /> : p.name}</td>
-              <td style={{ padding: 10 }}>{editId === p.id ? <input style={{ padding: 8, borderRadius: 4, border: '1px solid #d0d7de' }} value={editSku} onChange={e => setEditSku(e.target.value)} /> : p.sku}</td>
-              <td style={{ padding: 10 }}>{p.quantity}</td>
-              <td style={{ padding: 10 }}>
-                {editId === p.id ? (
-                  <>
-                    <button style={{ background: '#28a745', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={saveEditProduct}>Lưu</button>
-                    <button style={{ background: '#aaa', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px' }} onClick={() => setEditId(null)}>Hủy</button>
-                  </>
-                ) : (
-                  <>
-                    <button style={{ background: '#ffc107', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={() => editProduct(p.id, p.name, p.sku)}>Sửa</button>
-                    <button style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={() => deleteProduct(p.id)}>Xóa</button>
-                  </>
-                )}
-              </td>
+      {warehouseFilter === 'all' ? (
+        <div>
+          {warehouses.concat([{ id: 'unassigned', name: 'Chưa gán' }]).map(w => {
+            const gid = w.id === 'unassigned' ? null : w.id;
+            const group = filtered.filter(p => (gid === null ? !p.warehouse_id : String(p.warehouse_id) === String(gid)));
+            if (group.length === 0) return null;
+            return (
+              <div key={w.id} style={{ marginBottom: 12 }}>
+                <h4 style={{ marginBottom: 6 }}>{w.name} ({group.length})</h4>
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 0, background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px #0001' }}>
+                  <thead style={{ background: '#eaf1fb' }}>
+                    <tr>
+                      <th style={{ padding: 12 }}>Tên</th>
+                      <th style={{ padding: 12 }}>SKU</th>
+                      <th style={{ padding: 12 }}>Số lượng</th>
+                      <th style={{ padding: 12 }}>Giá bán</th>
+                      <th style={{ padding: 12 }}>Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.map(p => (
+                      <tr key={p.sku} style={{ borderBottom: '1px solid #eee' }}>
+                        <td style={{ padding: 10 }}>{editId === p.id ? <input style={{ padding: 8, borderRadius: 4, border: '1px solid #d0d7de' }} value={editName} onChange={e => setEditName(e.target.value)} /> : p.name}</td>
+                        <td style={{ padding: 10 }}>{editId === p.id ? <input style={{ padding: 8, borderRadius: 4, border: '1px solid #d0d7de' }} value={editSku} onChange={e => setEditSku(e.target.value)} /> : p.sku}</td>
+                        <td style={{ padding: 10 }}>{p.quantity}</td>
+                        <td style={{ padding: 10 }}>{p.price}</td>
+                        <td style={{ padding: 10 }}>
+                          {editId === p.id ? (
+                            <>
+                              <button type="button" style={{ background: '#28a745', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={saveEditProduct}>Lưu</button>
+                              <button type="button" style={{ background: '#aaa', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px' }} onClick={() => setEditId(null)}>Hủy</button>
+                            </>
+                          ) : (
+                            <>
+                              <button type="button" style={{ marginRight: 8, padding: '6px 10px', borderRadius: 6, background: '#ffc107', color: '#fff', border: 'none' }} onClick={() => editProduct(p.id, p.name, p.sku)}>Sửa</button>
+                              <button type="button" style={{ marginLeft: 8, padding: '6px 10px', borderRadius: 6, background: '#dc3545', color: '#fff', border: 'none' }} onClick={() => deleteProduct(p.id)}>Xóa</button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 18, background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px #0001' }}>
+          <thead style={{ background: '#eaf1fb' }}>
+            <tr>
+              <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('name'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Tên {sortBy === 'name' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
+              <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('sku'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>SKU {sortBy === 'sku' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
+              <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('quantity'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Số lượng {sortBy === 'quantity' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
+              <th style={{ padding: 12 }}>Thao tác</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.map(p => (
+              <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+                <td style={{ padding: 10 }}>{editId === p.id ? <input style={{ padding: 8, borderRadius: 4, border: '1px solid #d0d7de' }} value={editName} onChange={e => setEditName(e.target.value)} /> : p.name}</td>
+                <td style={{ padding: 10 }}>{editId === p.id ? <input style={{ padding: 8, borderRadius: 4, border: '1px solid #d0d7de' }} value={editSku} onChange={e => setEditSku(e.target.value)} /> : p.sku}</td>
+                <td style={{ padding: 10 }}>{p.quantity}</td>
+                <td style={{ padding: 10 }}>
+                  {editId === p.id ? (
+                    <>
+                      <button style={{ background: '#28a745', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={saveEditProduct}>Lưu</button>
+                      <button style={{ background: '#aaa', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px' }} onClick={() => setEditId(null)}>Hủy</button>
+                    </>
+                  ) : (
+                    <>
+                      <button style={{ background: '#ffc107', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={() => editProduct(p.id, p.name, p.sku)}>Sửa</button>
+                      <button style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', marginRight: 6 }} onClick={() => deleteProduct(p.id)}>Xóa</button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       <div style={{ color: '#888', fontSize: 15 }}>Tổng số sản phẩm: {sorted.length}</div>
     </div>
   );

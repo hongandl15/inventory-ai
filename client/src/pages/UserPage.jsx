@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { API_BASE } from '../config';
 
 export default function UserPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [user, setUser] = useState(null);
 
-  const register = () => {
-     axios.post('https://inventory-ai-4pfd.onrender.com/api/users/register', { username, password }).then(() => alert('Đăng ký thành công!'));
-  };
+    const register = () => {
+      axios.post(`${API_BASE}/api/users/register`, { username, password }).then(() => alert('Đăng ký thành công!'));
+    };
 
-  const login = () => {
-     axios.post('https://inventory-ai-4pfd.onrender.com/api/users/login', { username, password }).then(res => setUser(res.data)).catch(() => alert('Đăng nhập thất bại'));
-  };
+    const login = () => {
+      axios.post(`${API_BASE}/api/users/login`, { username, password }).then(res => setUser(res.data)).catch(() => alert('Đăng nhập thất bại'));
+    };
 
   return (
     <div style={{ background: '#fff', borderRadius: 8, padding: 24, marginBottom: 24, boxShadow: '0 2px 8px #0001' }}>
