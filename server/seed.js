@@ -1,4 +1,5 @@
 import sqlite3 from 'sqlite3';
+import fs from 'fs';
 
 const db = new sqlite3.Database('./inventory.db');
 
@@ -15,6 +16,17 @@ function all(sql, params=[]) {
 
 export async function seed() {
   try {
+    // Ensure `price` column exists on products (safe to run repeatedly)
+    try {
+      const pcols = await all("PRAGMA table_info(products)");
+      const pnames = pcols.map(c => c.name);
+      if (!pnames.includes('price')) {
+        await run('ALTER TABLE products ADD COLUMN price REAL');
+      }
+    } catch(e) {
+      // ignore if table doesn't exist yet
+    }
+
     // Clear existing data
     await run('PRAGMA foreign_keys = OFF');
     await run('BEGIN TRANSACTION');
@@ -24,59 +36,127 @@ export async function seed() {
       await run(`DELETE FROM sqlite_sequence WHERE name='${t}'`);
     }
 
-    // Create warehouses
-    const whs = [
-      { name: 'Kho Hà Nội', location: 'Hà Nội' },
-      { name: 'Kho TP.HCM', location: 'TP.HCM' },
-      { name: 'Kho Đà Nẵng', location: 'Đà Nẵng' }
-    ];
+    // If a data file exists at project root (data.md / CSV/TSV), use it to seed
+    const candidates = ['./data.md','./data.csv','../data.md','../data.csv','./data.txt'];
+    let dataPath = null;
+    for (const c of candidates) if (fs.existsSync(c)) { dataPath = c; break; }
     const whIds = [];
-    for (const w of whs) {
-      const r = await run('INSERT INTO warehouses (name, location) VALUES (?, ?)', [w.name, w.location]);
-      whIds.push(r.lastID);
-    }
-
-    // Create users
-    // Passwords are hashed by the app on register, but seed uses plain text for demo users table (if bcrypt present in app it's fine)
-    await run("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin','adminpass','admin')");
-    await run("INSERT OR IGNORE INTO users (username, password, role) VALUES ('alice','alicepass','user')");
-    await run("INSERT OR IGNORE INTO users (username, password, role) VALUES ('bob','bobpass','user')");
-
-    const users = await all('SELECT id, username FROM users');
-    const userMap = {};
-    users.forEach(u => userMap[u.username] = u.id);
-
-    // Assign users to warehouses
-    await run('INSERT OR IGNORE INTO user_warehouses (user_id, warehouse_id) VALUES (?, ?)', [userMap.alice, whIds[0]]);
-    await run('INSERT OR IGNORE INTO user_warehouses (user_id, warehouse_id) VALUES (?, ?)', [userMap.bob, whIds[1]]);
-
-    // Create products across warehouses
-    const products = [
-      { name: 'Bút bi', sku: 'PEN-001', quantity: 120, warehouse_id: whIds[0] },
-      { name: 'Sổ tay', sku: 'NBK-001', quantity: 80, warehouse_id: whIds[0] },
-      { name: 'Túi xách', sku: 'BAG-001', quantity: 20, warehouse_id: whIds[1] },
-      { name: 'Chuột máy tính', sku: 'MSE-001', quantity: 200, warehouse_id: whIds[2] },
-      { name: 'Bàn phím', sku: 'KBD-001', quantity: 150, warehouse_id: whIds[1] },
-      { name: 'Tai nghe', sku: 'HPH-001', quantity: 60, warehouse_id: whIds[2] }
-    ];
     const prodIds = [];
-    for (const p of products) {
-      const r = await run('INSERT INTO products (name, sku, quantity, warehouse_id) VALUES (?, ?, ?, ?)', [p.name, p.sku, p.quantity, p.warehouse_id]);
-      prodIds.push(r.lastID);
-    }
+    const userMap = {};
+    const productMap = new Map();
+    const warehouseMap = new Map();
 
-    // Create transactions for history
-    const now = new Date();
-    const txs = [
-      { product_id: prodIds[0], type: 'in', amount: 50, date: new Date(now.getTime() - 1000*60*60*24*10).toISOString(), warehouse_id: whIds[0] },
-      { product_id: prodIds[0], type: 'out', amount: 10, date: new Date(now.getTime() - 1000*60*60*24*7).toISOString(), warehouse_id: whIds[0] },
-      { product_id: prodIds[2], type: 'in', amount: 30, date: new Date(now.getTime() - 1000*60*60*24*5).toISOString(), warehouse_id: whIds[1] },
-      { product_id: prodIds[3], type: 'out', amount: 20, date: new Date(now.getTime() - 1000*60*60*24*2).toISOString(), warehouse_id: whIds[2] },
-      { product_id: prodIds[4], type: 'in', amount: 100, date: new Date(now.getTime() - 1000*60*60*24*3).toISOString(), warehouse_id: whIds[1] }
-    ];
-    for (const t of txs) {
-      await run('INSERT INTO transactions (product_id, type, amount, date, warehouse_id) VALUES (?, ?, ?, ?, ?)', [t.product_id, t.type, t.amount, t.date, t.warehouse_id]);
-    }
+    if (fs.existsSync(dataPath)) {
+      const raw = fs.readFileSync(dataPath, 'utf8').trim();
+      if (raw) {
+        const lines = raw.split(/\r?\n/).filter(Boolean);
+        const first = lines.shift();
+        const delimiter = first.includes('\t') ? '\t' : ',';
+        const headers = first.split(delimiter).map(h => h.trim());
+        const idx = (name) => headers.indexOf(name);
+
+        for (const line of lines) {
+          const cols = line.split(delimiter).map(c => c.trim());
+          // insert into raw_data table with best-effort mapping
+          try {
+            const map = (name) => {
+              const i = headers.indexOf(name);
+              return i >= 0 ? (cols[i] !== undefined ? cols[i] : null) : null;
+            };
+            await run(`INSERT INTO raw_data (region_name,country_name,state,city,postal_code,warehouse_address,warehouse_name,employee_name,employee_email,employee_phone,employee_hire_date,employee_job_title,category_name,product_name,product_description,product_standard_cost,profit,product_list_price,customer_name,customer_address,customer_credit_limit,customer_email,customer_phone,status,order_date,order_item_quantity,per_unit_price,total_item_quantity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+              map('RegionName'), map('CountryName'), map('State'), map('City'), map('PostalCode'), map('WarehouseAddress'), map('WarehouseName'), map('EmployeeName'), map('EmployeeEmail'), map('EmployeePhone'), map('EmployeeHireDate'), map('EmployeeJobTitle'), map('CategoryName'), map('ProductName'), map('ProductDescription'), map('ProductStandardCost'), map('Profit'), map('ProductListPrice'), map('CustomerName'), map('CustomerAddress'), map('CustomerCreditLimit'), map('CustomerEmail'), map('CustomerPhone'), map('Status'), map('OrderDate'), map('OrderItemQuantity'), map('PerUnitPrice'), map('TotalItemQuantity')
+            ]).catch(()=>{});
+          } catch(e) {
+            // non-fatal
+          }
+          const warehouseName = cols[idx('WarehouseName')] || cols[idx('Warehouse')] || 'Default Warehouse';
+          const warehouseAddress = cols[idx('WarehouseAddress')] || '';
+          const employeeEmail = cols[idx('EmployeeEmail')] || cols[idx('Employee')];
+          const employeeName = cols[idx('EmployeeName')] || employeeEmail || 'user';
+          const productName = cols[idx('ProductName')] || cols[idx('Product')];
+          const productQtyRaw = cols[idx('TotalItemQuantity')] || cols[idx('OrderItemQuantity')] || '0';
+          const orderQtyRaw = cols[idx('OrderItemQuantity')] || '0';
+          const orderDate = cols[idx('OrderDate')] || new Date().toISOString();
+
+          // ensure warehouse
+          if (!warehouseMap.has(warehouseName)) {
+            const r = await run('INSERT INTO warehouses (name, location) VALUES (?, ?)', [warehouseName, warehouseAddress || '']);
+            warehouseMap.set(warehouseName, r.lastID);
+            whIds.push(r.lastID);
+          }
+          const wid = warehouseMap.get(warehouseName);
+
+          // ensure user
+          if (employeeEmail && !userMap[employeeEmail]) {
+            await run('INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)', [employeeEmail, 'password', 'user']);
+            const u = await all('SELECT id, username FROM users WHERE username = ?', [employeeEmail]);
+            if (u && u[0]) userMap[employeeEmail] = u[0].id;
+          }
+
+          // ensure product
+          const productKey = `${productName}::${wid}`;
+          if (productName && !productMap.has(productKey)) {
+            const qty = parseInt(productQtyRaw.replace(/[^0-9.-]/g, '')) || parseInt(orderQtyRaw.replace(/[^0-9.-]/g, '')) || 0;
+            const sku = (cols[idx('SKU')] || '').trim() || productName.slice(0,20).replace(/\s+/g,'-');
+            const priceRaw = (cols[idx('ProductListPrice')] || cols[idx('PerUnitPrice')] || '').trim();
+            const price = (priceRaw && priceRaw !== '') ? (parseFloat(priceRaw.replace(/[^0-9.-]/g,'')) || null) : null;
+            const r = await run('INSERT INTO products (name, sku, quantity, warehouse_id, price) VALUES (?, ?, ?, ?, ?)', [productName, sku, qty, wid, price]);
+            productMap.set(productKey, r.lastID);
+            prodIds.push(r.lastID);
+          }
+
+          // insert a transaction record for the order (if product exists)
+          if (productName) {
+            const pid = productMap.get(productKey);
+            const amt = parseInt(orderQtyRaw.replace(/[^0-9.-]/g, '')) || 0;
+            const dateIso = (() => {
+              try { return new Date(orderDate).toISOString(); } catch(e){ return new Date().toISOString(); }
+            })();
+            await run('INSERT INTO transactions (product_id, type, amount, date, warehouse_id) VALUES (?, ?, ?, ?, ?)', [pid, 'in', amt, dateIso, wid]);
+          }
+        }
+      }
+    } 
+    // else {
+    //   // fallback: original demo seed (kept minimal)
+    //   const whs = [
+    //     { name: 'Kho Hà Nội', location: 'Hà Nội' },
+    //     { name: 'Kho TP.HCM', location: 'TP.HCM' },
+    //     { name: 'Kho Đà Nẵng', location: 'Đà Nẵng' }
+    //   ];
+    //   for (const w of whs) {
+    //     const r = await run('INSERT INTO warehouses (name, location) VALUES (?, ?)', [w.name, w.location]);
+    //     whIds.push(r.lastID);
+    //   }
+
+    //   await run("INSERT OR IGNORE INTO users (username, password, role) VALUES ('admin','adminpass','admin')");
+    //   await run("INSERT OR IGNORE INTO users (username, password, role) VALUES ('alice','alicepass','user')");
+    //   await run("INSERT OR IGNORE INTO users (username, password, role) VALUES ('bob','bobpass','user')");
+
+    //   const users = await all('SELECT id, username FROM users');
+    //   users.forEach(u => userMap[u.username] = u.id);
+
+    //   await run('INSERT OR IGNORE INTO user_warehouses (user_id, warehouse_id) VALUES (?, ?)', [userMap.alice, whIds[0]]).catch(()=>{});
+    //   await run('INSERT OR IGNORE INTO user_warehouses (user_id, warehouse_id) VALUES (?, ?)', [userMap.bob, whIds[1]]).catch(()=>{});
+
+    //   const products = [
+    //     { name: 'Bút bi', sku: 'PEN-001', quantity: 120, warehouse_id: whIds[0] },
+    //     { name: 'Sổ tay', sku: 'NBK-001', quantity: 80, warehouse_id: whIds[0] },
+    //     { name: 'Túi xách', sku: 'BAG-001', quantity: 20, warehouse_id: whIds[1] }
+    //   ];
+    //   for (const p of products) {
+    //     const r = await run('INSERT INTO products (name, sku, quantity, warehouse_id) VALUES (?, ?, ?, ?)', [p.name, p.sku, p.quantity, p.warehouse_id]);
+    //     prodIds.push(r.lastID);
+    //   }
+
+    //   const now = new Date();
+    //   const txs = [
+    //     { product_id: prodIds[0], type: 'in', amount: 50, date: new Date(now.getTime() - 1000*60*60*24*10).toISOString(), warehouse_id: whIds[0] }
+    //   ];
+    //   for (const t of txs) {
+    //     await run('INSERT INTO transactions (product_id, type, amount, date, warehouse_id) VALUES (?, ?, ?, ?, ?)', [t.product_id, t.type, t.amount, t.date, t.warehouse_id]);
+    //   }
+    // }
 
     await run('COMMIT');
     await run('PRAGMA foreign_keys = ON');

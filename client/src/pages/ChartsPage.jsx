@@ -79,6 +79,29 @@ export default function ChartsPage() {
             <Legend />
           </PieChart>
         </ResponsiveContainer>
+        <div style={{ marginTop: 12, display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ width: 16, height: 12, background: COLORS[0] }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Tồn kho thấp</div>
+              <div style={{ color: '#666' }}>Số lượng &lt; 50 — xem xét đặt hàng</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ width: 16, height: 12, background: COLORS[1] }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Tồn kho đủ</div>
+              <div style={{ color: '#666' }}>50 ≤ Số lượng ≤ 150 — mức vừa đủ</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ width: 16, height: 12, background: COLORS[2] }} />
+            <div>
+              <div style={{ fontWeight: 700 }}>Tồn kho cao</div>
+              <div style={{ color: '#666' }}>Số lượng &gt; 150 — tồn kho lớn</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

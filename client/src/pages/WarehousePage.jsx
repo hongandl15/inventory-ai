@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE } from '../config';
+import { formatNumber, formatDate } from '../utils/format';
 
 export default function WarehousePage(){
   const [warehouses, setWarehouses] = useState([]);
@@ -62,7 +64,7 @@ export default function WarehousePage(){
         <thead style={{ background:'#eaf1fb' }}><tr><th style={{ padding:12 }}>ID</th><th style={{ padding:12 }}>Tên</th><th style={{ padding:12 }}>Vị trí</th></tr></thead>
         <tbody>
           {warehouses.map(w=> (
-            <tr key={w.id} style={{ borderBottom:'1px solid #eee' }}><td style={{ padding:10 }}>{w.id}</td><td style={{ padding:10 }}>{w.name}</td><td style={{ padding:10 }}>{w.location}</td></tr>
+            <tr key={w.id} style={{ borderBottom:'1px solid #eee' }}><td style={{ padding:10 }}>{w.id}</td><td style={{ padding:10 }}><Link to={`/warehouse/${w.id}`}>{w.name}</Link></td><td style={{ padding:10 }}>{w.location}</td></tr>
           ))}
         </tbody>
       </table>
@@ -75,7 +77,7 @@ export default function WarehousePage(){
             <select value={selectedProduct} onChange={e=>setSelectedProduct(e.target.value)} style={{ width:'100%', padding:8, borderRadius:6 }}>
               <option value="">-- Chọn sản phẩm --</option>
               {products.map(p => (
-                <option key={p.id} value={p.id}>{p.name} (SKU:{p.sku}) — kho:{p.warehouse_id || '—'} — tồn:{p.quantity}</option>
+                <option key={p.id} value={p.id}>{p.name} (SKU:{p.sku}) — kho:{p.warehouse_id || '—'} — tồn:{formatNumber(p.quantity)}</option>
               ))}
             </select>
           </div>
@@ -108,8 +110,8 @@ export default function WarehousePage(){
               <tr key={t.id} style={{ borderBottom:'1px solid #eee' }}>
                 <td style={{ padding:8 }}>{t.id}</td>
                 <td style={{ padding:8 }}>{t.product_from_name || t.product_id_from} → {t.product_to_name || t.product_id_to} <div style={{ color:'#666', fontSize:12 }}>{t.from_warehouse_name || t.from_warehouse_id} → {t.to_warehouse_name || t.to_warehouse_id}</div></td>
-                <td style={{ padding:8 }}>{t.quantity}</td>
-                <td style={{ padding:8 }}>{new Date(t.date).toLocaleString()}</td>
+                <td style={{ padding:8 }}>{formatNumber(t.quantity)}</td>
+                <td style={{ padding:8 }}>{formatDate(t.date)}</td>
               </tr>
             ))}
           </tbody>

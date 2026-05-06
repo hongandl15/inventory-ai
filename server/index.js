@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import sqlite3 from 'sqlite3';
+import fs from 'fs';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -76,6 +77,37 @@ CREATE TABLE IF NOT EXISTS transfers (
   from_warehouse_id INTEGER,
   to_warehouse_id INTEGER
 );
+CREATE TABLE IF NOT EXISTS raw_data (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  region_name TEXT,
+  country_name TEXT,
+  state TEXT,
+  city TEXT,
+  postal_code TEXT,
+  warehouse_address TEXT,
+  warehouse_name TEXT,
+  employee_name TEXT,
+  employee_email TEXT,
+  employee_phone TEXT,
+  employee_hire_date TEXT,
+  employee_job_title TEXT,
+  category_name TEXT,
+  product_name TEXT,
+  product_description TEXT,
+  product_standard_cost TEXT,
+  profit TEXT,
+  product_list_price TEXT,
+  customer_name TEXT,
+  customer_address TEXT,
+  customer_credit_limit TEXT,
+  customer_email TEXT,
+  customer_phone TEXT,
+  status TEXT,
+  order_date TEXT,
+  order_item_quantity TEXT,
+  per_unit_price TEXT,
+  total_item_quantity TEXT
+);
 `;
 db.exec(initSQL);
 
@@ -107,6 +139,10 @@ async function migrateIfNeeded() {
     if (!pnames.includes('warehouse_id')) {
       console.log('Migrating: adding warehouse_id to products');
       await runAsync('ALTER TABLE products ADD COLUMN warehouse_id INTEGER');
+    }
+    if (!pnames.includes('price')) {
+      console.log('Migrating: adding price to products');
+      await runAsync('ALTER TABLE products ADD COLUMN price REAL');
     }
     const tcols = await allAsync("PRAGMA table_info(transactions)");
     const tnames = tcols.map(c => c.name);
@@ -159,10 +195,43 @@ app.get('/api/products', (req, res) => {
   }
 });
 
+// API: Paginated products (supports warehouse filter, search, sort)
+app.get('/api/products/paginated', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const perPage = Math.max(1, parseInt(req.query.perPage || '20', 10));
+    const warehouse_id = req.query.warehouse_id;
+    const q = req.query.q || '';
+    const sortBy = req.query.sortBy || 'name';
+    const sortDir = (req.query.sortDir || 'asc').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
+    const allowedSort = ['name','sku','quantity','price'];
+    const sortCol = allowedSort.includes(sortBy) ? sortBy : 'name';
+
+    const params = [];
+    const conds = [];
+    if (warehouse_id) { conds.push('warehouse_id = ?'); params.push(warehouse_id); }
+    if (q) { conds.push('(name LIKE ? OR sku LIKE ?)'); params.push(`%${q}%`, `%${q}%`); }
+
+    const where = conds.length ? ('WHERE ' + conds.join(' AND ')) : '';
+
+    const countRow = await getAsync(`SELECT COUNT(*) as c FROM products ${where}`, params);
+    const total = countRow ? countRow.c : 0;
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
+
+    const offset = (page - 1) * perPage;
+    const sql = `SELECT * FROM products ${where} ORDER BY ${sortCol} ${sortDir} LIMIT ? OFFSET ?`;
+    const rows = await allAsync(sql, params.concat([perPage, offset]));
+    res.json({ items: rows, total, page, perPage, totalPages });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // API: Add product
 app.post('/api/products', (req, res) => {
-  const { name, sku, quantity, warehouse_id } = req.body;
-  db.run('INSERT INTO products (name, sku, quantity, warehouse_id) VALUES (?, ?, ?, ?)', [name, sku, quantity, warehouse_id || null], function(err) {
+  const { name, sku, quantity, warehouse_id, price } = req.body;
+  db.run('INSERT INTO products (name, sku, quantity, warehouse_id, price) VALUES (?, ?, ?, ?, ?)', [name, sku, quantity, warehouse_id || null, price || null], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ id: this.lastID });
   });
@@ -200,6 +269,48 @@ app.get('/api/products/:id', (req, res) => {
     if (!row) return res.status(404).json({ error: 'Not found' });
     res.json(row);
   });
+});
+
+// API: Get product full detail (product + transactions + sales + warehouse + related raw_data rows)
+app.get('/api/products/:id/full', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const product = await getAsync('SELECT * FROM products WHERE id = ?', [id]);
+    if (!product) return res.status(404).json({ error: 'Not found' });
+    const transactions = await allAsync('SELECT * FROM transactions WHERE product_id = ? ORDER BY date DESC LIMIT 200', [id]);
+    const sales = await allAsync('SELECT * FROM sales WHERE product_id = ? ORDER BY date DESC LIMIT 200', [id]);
+    const warehouse = product.warehouse_id ? await getAsync('SELECT * FROM warehouses WHERE id = ?', [product.warehouse_id]) : null;
+    // try to find related raw_data rows by product name or SKU
+    const rawRows = await allAsync('SELECT * FROM raw_data WHERE product_name = ? OR product_description LIKE ? LIMIT 500', [product.name, `%${product.sku || ''}%`]);
+    res.json({ product, transactions, sales, warehouse, rawRows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Update product fields (name, sku, quantity, price, warehouse_id)
+app.patch('/api/products/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const allowed = ['name','sku','quantity','price','warehouse_id'];
+    const fields = [];
+    const params = [];
+    for (const k of allowed) {
+      if (req.body[k] !== undefined) {
+        fields.push(`${k} = ?`);
+        params.push(req.body[k]);
+      }
+    }
+    if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+    params.push(id);
+    const sql = `UPDATE products SET ${fields.join(', ')} WHERE id = ?`;
+    db.run(sql, params, function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ updated: this.changes });
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // API: Get transactions by product
@@ -284,6 +395,39 @@ app.get('/api/transactions', (req, res) => {
   });
 });
 
+// API: return raw parsed data file (data.md / data.csv) as JSON rows
+app.get('/api/rawdata', (req, res) => {
+  try {
+    const candidates = ['./data.md','./data.csv','../data.md','../data.csv','./data.txt','../data.txt'];
+    let path = null;
+    for (const c of candidates) if (fs.existsSync(c)) { path = c; break; }
+    if (!path) return res.status(404).json({ error: 'No data file found' });
+    const raw = fs.readFileSync(path, 'utf8').trim();
+    if (!raw) return res.json([]);
+    const lines = raw.split(/\r?\n/).filter(Boolean);
+    const first = lines.shift();
+    const delimiter = first.includes('\t') ? '\t' : ',';
+    const headers = first.split(delimiter).map(h => h.trim());
+    const rows = lines.map(line => {
+      const cols = line.split(delimiter).map(c => c.trim());
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = cols[i] !== undefined ? cols[i] : null; });
+      return obj;
+    });
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: return rows saved in DB raw_data table
+app.get('/api/rawdb', (req, res) => {
+  db.all('SELECT * FROM raw_data ORDER BY id LIMIT 10000', (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
 
 
 app.post('/api/ai/test', async (req, res) => {
@@ -313,6 +457,64 @@ app.get('/api/report/summary', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
+});
+
+// API: DS Lab summary endpoint - compute basic stats, histograms and top categories
+app.get('/api/ds/summary', async (req, res) => {
+  try {
+    // products summary
+    const products = await allAsync('SELECT id, name, sku, quantity, price, warehouse_id FROM products');
+    const prodCount = products.length;
+    const quantities = products.map(p => Number(p.quantity) || 0);
+    const prices = products.map(p => (p.price !== null && p.price !== undefined) ? Number(p.price) : null).filter(v => v !== null);
+
+    const sum = arr => arr.reduce((a,b)=>a+b,0);
+    const stats = (arr) => ({
+      count: arr.length,
+      sum: sum(arr),
+      mean: arr.length ? sum(arr)/arr.length : 0,
+      min: arr.length ? Math.min(...arr) : 0,
+      max: arr.length ? Math.max(...arr) : 0
+    });
+
+    const qtyStats = stats(quantities);
+    const priceStats = stats(prices);
+
+    // histogram buckets helper (simple fixed buckets)
+    function histogram(arr, buckets = 6) {
+      if (!arr.length) return { buckets: [], min:0, max:0 };
+      const min = Math.min(...arr);
+      const max = Math.max(...arr);
+      const width = (max - min) / buckets || 1;
+      const b = Array.from({length: buckets}, () => 0);
+      for (const v of arr) {
+        const idx = Math.min(buckets-1, Math.floor((v - min) / width));
+        b[idx]++;
+      }
+      const ranges = b.map((c,i) => ({
+        range: `${(min + i*width).toFixed(2)} - ${(min + (i+1)*width).toFixed(2)}`,
+        count: c
+      }));
+      return { buckets: ranges, min, max };
+    }
+
+    const qtyHist = histogram(quantities, 6);
+    const priceHist = histogram(prices, 6);
+
+    // top categories from raw_data.category_name
+    const cats = await allAsync('SELECT category_name, COUNT(*) as c FROM raw_data GROUP BY category_name ORDER BY c DESC LIMIT 10');
+
+    // top warehouses by product count
+    const whTop = await allAsync('SELECT w.id, w.name, COUNT(p.id) as c FROM warehouses w LEFT JOIN products p ON p.warehouse_id = w.id GROUP BY w.id ORDER BY c DESC LIMIT 10');
+
+    res.json({
+      products: { total: prodCount, qtyStats, priceStats, qtyHist, priceHist },
+      topCategories: cats,
+      topWarehouses: whTop
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // API: Transaction report by date
@@ -360,6 +562,40 @@ app.get('/api/warehouses', (req, res) => {
   db.all('SELECT * FROM warehouses', (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
+  });
+});
+
+// API: Get full warehouse detail (warehouse + products + transfers + assigned users + related raw rows)
+app.get('/api/warehouses/:id/full', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const warehouse = await getAsync('SELECT * FROM warehouses WHERE id = ?', [id]);
+    if (!warehouse) return res.status(404).json({ error: 'Not found' });
+    const products = await allAsync('SELECT * FROM products WHERE warehouse_id = ?', [id]);
+    const transfers = await allAsync('SELECT * FROM transfers WHERE from_warehouse_id = ? OR to_warehouse_id = ? ORDER BY date DESC LIMIT 200', [id, id]);
+    const users = await allAsync('SELECT u.* FROM users u JOIN user_warehouses uw ON u.id = uw.user_id WHERE uw.warehouse_id = ?', [id]);
+    const rawRows = await allAsync('SELECT * FROM raw_data WHERE warehouse_name = ? OR warehouse_address = ? LIMIT 500', [warehouse.name, warehouse.location]);
+    res.json({ warehouse, products, transfers, users, rawRows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: Update warehouse
+app.patch('/api/warehouses/:id', (req, res) => {
+  const id = req.params.id;
+  const allowed = ['name','location'];
+  const fields = [];
+  const params = [];
+  for (const k of allowed) {
+    if (req.body[k] !== undefined) { fields.push(`${k} = ?`); params.push(req.body[k]); }
+  }
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+  params.push(id);
+  const sql = `UPDATE warehouses SET ${fields.join(', ')} WHERE id = ?`;
+  db.run(sql, params, function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ updated: this.changes });
   });
 });
 
@@ -435,25 +671,27 @@ app.post('/api/ai', async (req, res) => {
   const { query } = req.body || {};
   try {
     // gather relevant data from DB
-    const products = await allAsync('SELECT id, name, sku, quantity, warehouse_id FROM products');
-    const transactions = await allAsync('SELECT id, product_id, type, amount, date, warehouse_id FROM transactions ORDER BY date DESC LIMIT 50');
-    const sales = await allAsync('SELECT id, product_id, quantity, unit_price, total, date, warehouse_id FROM sales ORDER BY date DESC LIMIT 50');
+    const products = await allAsync('SELECT id, name, sku, quantity, price, warehouse_id FROM products');
+    const transactions = await allAsync('SELECT id, product_id, type, amount, date, warehouse_id FROM transactions ORDER BY date DESC');
+    const sales = await allAsync('SELECT id, product_id, quantity, unit_price, total, date, warehouse_id FROM sales ORDER BY date DESC');
     const warehouses = await allAsync('SELECT id, name, location FROM warehouses');
 
     // build lightweight summaries to keep prompt size reasonable
-    const whMap = Object.fromEntries(warehouses.map(w => [w.id, w.name]));
+    // Build context with all columns for each record (limit to avoid context overflow)
+    function formatRow(row) {
+      return Object.entries(row).map(([k, v]) => `${k}: ${v}`).join(' | ');
+    }
 
-    const productSummaries = products.map(p => `${p.id}|${p.name}|sku:${p.sku}|qty:${p.quantity}|wh:${whMap[p.warehouse_id] || p.warehouse_id || 'unassigned'}`);
-    const recentTx = transactions.map(t => `${t.date} - ${t.type.toUpperCase()} product:${t.product_id} amount:${t.amount} wh:${whMap[t.warehouse_id] || t.warehouse_id || '—'}`);
-    const recentSales = sales.map(s => `${s.date} - sale product:${s.product_id} qty:${s.quantity} total:${s.total} wh:${whMap[s.warehouse_id] || s.warehouse_id || '—'}`);
-
-    // Compose context text
     const contextParts = [];
-    contextParts.push(`Warehouses (${warehouses.length}):\n${warehouses.map(w=>`- ${w.id}: ${w.name} (${w.location||''})`).join('\n')}`);
-    contextParts.push(`Products (${products.length}):\n${productSummaries.slice(0,200).join('\n')}`);
-    if (products.length > 200) contextParts.push(`...and ${products.length - 200} more products`);
-    contextParts.push(`Recent Transactions (${transactions.length}):\n${recentTx.join('\n')}`);
-    contextParts.push(`Recent Sales (${sales.length}):\n${recentSales.join('\n')}`);
+    const LIMIT = 100;
+    contextParts.push(`Warehouses (${warehouses.length}):\n${warehouses.slice(0,LIMIT).map(formatRow).join('\n')}`);
+    if (warehouses.length > LIMIT) contextParts.push(`...and ${warehouses.length - LIMIT} more warehouses`);
+    contextParts.push(`Products (${products.length}):\n${products.slice(0,LIMIT).map(formatRow).join('\n')}`);
+    if (products.length > LIMIT) contextParts.push(`...and ${products.length - LIMIT} more products`);
+    contextParts.push(`Transactions (${transactions.length}):\n${transactions.slice(0,LIMIT).map(formatRow).join('\n')}`);
+    if (transactions.length > LIMIT) contextParts.push(`...and ${transactions.length - LIMIT} more transactions`);
+    contextParts.push(`Sales (${sales.length}):\n${sales.slice(0,LIMIT).map(formatRow).join('\n')}`);
+    if (sales.length > LIMIT) contextParts.push(`...and ${sales.length - LIMIT} more sales`);
 
     const context = contextParts.join('\n\n');
 
@@ -475,6 +713,132 @@ app.post('/api/ai', async (req, res) => {
   } catch (err) {
     console.error('RAG error:', err?.message || err);
     res.status(500).json({ error: err.message || String(err) });
+  }
+});
+
+// (Removed notebook image static serving)
+
+// API: Export CSV for products or raw_data
+app.get('/api/ds/export', async (req, res) => {
+  try {
+    const type = req.query.type === 'raw' ? 'raw' : 'products';
+    let rows = [];
+    if (type === 'raw') {
+      rows = await allAsync('SELECT * FROM raw_data');
+    } else {
+      rows = await allAsync('SELECT * FROM products');
+    }
+    if (!rows || !rows.length) return res.status(200).send('');
+    const keys = Object.keys(rows[0]);
+    const csvLines = [keys.join(',')];
+    for (const r of rows) {
+      const line = keys.map(k => {
+        const v = r[k] === null || r[k] === undefined ? '' : String(r[k]).replace(/"/g,'""');
+        return `"${v}"`;
+      }).join(',');
+      csvLines.push(line);
+    }
+    const filename = `ds_export_${type}_${Date.now()}.csv`;
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csvLines.join('\n'));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper: Pearson correlation
+function pearson(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n === 0) return 0;
+  const ma = a.reduce((s,x)=>s+x,0)/a.length;
+  const mb = b.reduce((s,x)=>s+x,0)/b.length;
+  const num = a.reduce((s,x,i)=>s + ((x - ma) * (b[i] - mb)), 0);
+  const sa = Math.sqrt(a.reduce((s,x)=>s + Math.pow(x - ma,2),0));
+  const sb = Math.sqrt(b.reduce((s,x,i)=>s + Math.pow(b[i] - mb,2),0));
+  const denom = sa * sb;
+  if (!denom) return 0;
+  return num / denom;
+}
+
+// API: Correlation matrix computed from numeric fields in raw_data and products
+app.get('/api/ds/correlation', async (req, res) => {
+  try {
+    // gather numeric columns from products
+    const prows = await allAsync('SELECT id, quantity, price FROM products');
+    const prodNums = {
+      quantity: prows.map(p => Number(p.quantity) || 0),
+      price: prows.map(p => (p.price !== null && p.price !== undefined) ? Number(p.price) : NaN)
+    };
+
+    // gather numeric columns from raw_data (attempt parsing common fields)
+    const rrows = await allAsync('SELECT product_standard_cost, profit, product_list_price, order_item_quantity, per_unit_price, total_item_quantity FROM raw_data');
+    const rawFields = ['product_standard_cost','profit','product_list_price','order_item_quantity','per_unit_price','total_item_quantity'];
+    const rawNums = {};
+    for (const f of rawFields) rawNums[f] = rrows.map(r => {
+      const v = r && r[f] !== undefined && r[f] !== null ? String(r[f]).replace(/[^0-9.+-eE]/g,'') : '';
+      const n = v === '' ? NaN : Number(v);
+      return isFinite(n) ? n : NaN;
+    });
+
+    // Build combined columns (only include columns with at least one finite number)
+    const cols = [];
+    const dataMap = {};
+    for (const k of Object.keys(prodNums)) {
+      const arr = prodNums[k].filter(v => !Number.isNaN(v));
+      if (arr.length) { cols.push(k); dataMap[k] = prodNums[k]; }
+    }
+    for (const k of Object.keys(rawNums)) {
+      const arr = rawNums[k].filter(v => !Number.isNaN(v));
+      if (arr.length) { cols.push(k); dataMap[k] = rawNums[k]; }
+    }
+
+    // compute matrix
+    const matrix = cols.map(c1 => cols.map(c2 => {
+      const a = dataMap[c1].map(v => Number.isFinite(v) ? v : 0);
+      const b = dataMap[c2].map(v => Number.isFinite(v) ? v : 0);
+      return Number(pearson(a,b).toFixed(4));
+    }));
+
+    res.json({ columns: cols, matrix });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// (Removed notebook-images endpoint)
+
+// (Removed notebook parsing endpoint)
+
+// API: Simple prediction endpoint (univariate linear regression)
+app.get('/api/ds/predict', async (req, res) => {
+  try {
+    // use raw_data product_list_price -> profit by default
+    const rows = await allAsync('SELECT id, product_name, product_list_price, profit FROM raw_data');
+    const data = rows.map(r => {
+      const xRaw = r.product_list_price || r.per_unit_price || '';
+      const x = Number(String(xRaw).replace(/[^0-9.+-eE]/g,''));
+      const y = Number(String(r.profit||'').replace(/[^0-9.+-eE]/g,''));
+      return { id: r.id, name: r.product_name || '', x: Number.isFinite(x) ? x : NaN, y: Number.isFinite(y) ? y : NaN };
+    });
+
+    const pairs = data.filter(d => !Number.isNaN(d.x) && !Number.isNaN(d.y));
+    if (pairs.length < 3) return res.status(400).json({ error: 'Not enough numeric rows to build model' });
+
+    const xs = pairs.map(p=>p.x);
+    const ys = pairs.map(p=>p.y);
+    const mean = arr => arr.reduce((s,v)=>s+v,0)/arr.length;
+    const mx = mean(xs), my = mean(ys);
+    let cov = 0, varx = 0;
+    for (let i=0;i<xs.length;i++){ cov += (xs[i]-mx)*(ys[i]-my); varx += Math.pow(xs[i]-mx,2); }
+    const beta = varx ? cov/varx : 0;
+    const alpha = my - beta*mx;
+
+    const predictions = data.map(d => ({ id: d.id, name: d.name, x: d.x, y: d.y, predicted: Number((alpha + beta*(Number.isFinite(d.x)?d.x:mx)).toFixed(4)) }));
+
+    res.json({ model: { intercept: Number(alpha.toFixed(6)), slope: Number(beta.toFixed(6)), trained_on: pairs.length }, predictions });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE } from '../config';
+import { formatNumber, formatDate } from '../utils/format';
 import * as XLSX from 'xlsx';
 
 export default function TransactionPage() {
@@ -94,21 +95,25 @@ export default function TransactionPage() {
                   <h4 style={{ marginBottom: 6 }}>{w.name} ({group.length})</h4>
                   <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px #0001' }}>
                     <thead style={{ background: '#eaf1fb' }}>
-                      <tr>
-                        <th style={{ padding: 12 }}>Loại</th>
-                        <th style={{ padding: 12 }}>Số lượng</th>
-                        <th style={{ padding: 12 }}>Ngày</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.map(h => (
-                        <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: 10 }}>{h.type === 'in' ? 'Nhập' : 'Xuất'}</td>
-                          <td style={{ padding: 10 }}>{h.amount}</td>
-                          <td style={{ padding: 10 }}>{h.date}</td>
+                        <tr>
+                          <th style={{ padding: 12 }}>Sản phẩm</th>
+                          <th style={{ padding: 12 }}>Loại</th>
+                          <th style={{ padding: 12 }}>Số lượng</th>
+                          <th style={{ padding: 12 }}>Ngày</th>
                         </tr>
-                      ))}
-                    </tbody>
+                      </thead>
+                      <tbody>
+                        {group.map(h => {
+                          const prod = products.find(p => Number(p.id) === Number(h.product_id));
+                          return (
+                          <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
+                            <td style={{ padding: 10 }}>{prod ? prod.name : '—'}</td>
+                            <td style={{ padding: 10 }}>{h.type === 'in' ? 'Nhập' : 'Xuất'}</td>
+                            <td style={{ padding: 10 }}>{formatNumber(h.amount)}</td>
+                            <td style={{ padding: 10 }}>{formatDate(h.date)}</td>
+                          </tr>
+                        )})}
+                      </tbody>
                   </table>
                 </div>
               );
@@ -117,19 +122,23 @@ export default function TransactionPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 8, overflow: 'hidden', boxShadow: '0 2px 8px #0001' }}>
               <thead style={{ background: '#eaf1fb' }}>
                 <tr>
+                  <th style={{ padding: 12 }}>Sản phẩm</th>
                   <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('type'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Loại</th>
                   <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('amount'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Số lượng {sortBy === 'amount' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
                   <th style={{ padding: 12, cursor: 'pointer' }} onClick={() => { setSortBy('date'); setSortDir(sortDir === 'asc' ? 'desc' : 'asc'); }}>Ngày {sortBy === 'date' ? (sortDir === 'asc' ? '▲' : '▼') : ''}</th>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(h => (
+                {sorted.map(h => {
+                  const prod = products.find(p => Number(p.id) === Number(h.product_id));
+                  return (
                   <tr key={h.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: 10 }}>{prod ? prod.name : '—'}</td>
                     <td style={{ padding: 10 }}>{h.type === 'in' ? 'Nhập' : 'Xuất'}</td>
-                    <td style={{ padding: 10 }}>{h.amount}</td>
-                    <td style={{ padding: 10 }}>{h.date}</td>
+                    <td style={{ padding: 10 }}>{formatNumber(h.amount)}</td>
+                    <td style={{ padding: 10 }}>{formatDate(h.date)}</td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           )}

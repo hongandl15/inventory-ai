@@ -4,12 +4,16 @@ import axios from 'axios';
 import { API_BASE } from './config';
 import './styles.css';
 import ProductPage from './pages/ProductPage.jsx';
+import ProductDetailPage from './pages/ProductDetailPage.jsx';
 import TransactionPage from './pages/TransactionPage.jsx';
 import ReportPage from './pages/ReportPage.jsx';
+import RawDataPage from './pages/RawDataPage.jsx';
 import AIPage from './pages/AIPage.jsx';
 import ChartsPage from './pages/ChartsPage.jsx';
+import DSPage from './pages/DSPage.jsx';
 import UserPage from './pages/UserPage.jsx';
 import WarehousePage from './pages/WarehousePage.jsx';
+import WarehouseDetailPage from './pages/WarehouseDetailPage.jsx';
 import RevenuePage from './pages/RevenuePage.jsx';
 
 function App() {
@@ -61,8 +65,10 @@ function App() {
             <NavLink to="/transaction" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Nhập/Xuất</NavLink>
             <NavLink to="/report" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Báo cáo</NavLink>
             <NavLink to="/charts" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Biểu đồ</NavLink>
+            <NavLink to="/ds" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>DS Lab</NavLink>
             <NavLink to="/revenue" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Doanh thu</NavLink>
             <NavLink to="/warehouses" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Kho</NavLink>
+            <NavLink to="/raw" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Dữ liệu gốc</NavLink>
           </nav>
 
           <div className="header-actions">
@@ -95,11 +101,15 @@ function App() {
           <Route path="/" element={<ProductPage />} />
           <Route path="/transaction" element={<TransactionPage />} />
           <Route path="/report" element={<ReportPage />} />
+          <Route path="/product/:id" element={<ProductDetailPage />} />
+          <Route path="/raw" element={<RawDataPage />} />
           <Route path="/charts" element={<ChartsPage />} />
+          <Route path="/ds" element={<DSPage />} />
           <Route path="/revenue" element={<RevenuePage />} />
           <Route path="/ai" element={<AIPage />} />
           <Route path="/user" element={<UserPage />} />
           <Route path="/warehouses" element={<WarehousePage />} />
+          <Route path="/warehouse/:id" element={<WarehouseDetailPage />} />
         </Routes>
       </div>
     </BrowserRouter>
