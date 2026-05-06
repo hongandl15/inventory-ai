@@ -31,7 +31,7 @@ export default function DSPage() {
 
   // Hàm để chạy mô hình dự đoán lợi nhuận dựa trên giá sản phẩm
   const fetchPredictions = () => {
-    axios.get(`http://127.0.0.1:5000/api/ds/predict`).then(r => setPredictions(r.data)).catch(()=>setPredictions(null));
+    axios.get(`${API_BASE_PREDICTION}/api/ds/predict`).then(r => setPredictions(r.data)).catch(()=>setPredictions(null));
   };
 
   // Hiển thị loading nếu đang tải dữ liệu
