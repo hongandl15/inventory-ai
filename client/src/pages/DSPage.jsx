@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { API_BASE } from '../config';
+import { API_BASE, API_BASE_PREDICTION } from '../config';
 import { ResponsiveContainer, ScatterChart, Scatter, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 // DSPage là trang chính của DS Lab, nơi hiển thị tóm tắt dữ liệu và chạy mô hình dự đoán lợi nhuận
