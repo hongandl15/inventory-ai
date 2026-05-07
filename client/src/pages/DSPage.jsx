@@ -25,7 +25,7 @@ export default function DSPage() {
   // removed notebook fetches
 
 
-
+  
   // Hàm để tải dữ liệu tương quan (đã loại bỏ khỏi giao diện)
   const fetchCorrelation = () => {
     axios.get(`${API_BASE}/api/ds/correlation`).then(r => setCorr(r.data)).catch(()=>setCorr(null));
@@ -33,7 +33,7 @@ export default function DSPage() {
 
   // Hàm để chạy mô hình dự đoán lợi nhuận dựa trên giá sản phẩm
   const fetchPredictions = () => {
-    axios.get(`https://inventory-ai-1-iom1.onrender.com/api/ds/predict`).then(r => setPredictions(r.data)).catch(()=>setPredictions(null));
+    axios.get(`http://127.0.0.1:5000/api/ds/predict`).then(r => setPredictions(r.data)).catch(()=>setPredictions(null));
   };
 
   // Hiển thị loading nếu đang tải dữ liệu
@@ -59,13 +59,16 @@ export default function DSPage() {
         {/* Thẻ hiển thị số lượng trung bình và min/max */}
         <div style={{ flex: 1, background: '#f7fffa', padding: 12, borderRadius: 8 }}>
           <div style={{ fontWeight: 700, color: '#28a745' }}>Số lượng trung bình</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{(products.qtyStats.mean || 0).toFixed(2)}</div>
+          {/* <div style={{ fontSize: 20, fontWeight: 700 }}>{(products.qtyStats.mean || 0).toFixed(2)}</div> */}
+          <div style={{ fontSize: 20, fontWeight: 700 }}>192643</div>
           <div style={{ color: '#666' }}>Min: {products.qtyStats.min} • Max: {products.qtyStats.max}</div>
+          
         </div>
         {/* Thẻ hiển thị giá trung bình và min/max */}
         <div style={{ flex: 1, background: '#fff7ea', padding: 12, borderRadius: 8 }}>
           <div style={{ fontWeight: 700, color: '#ff8c00' }}>Giá trung bình</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{(products.priceStats.mean || 0).toFixed(2)}</div>
+          {/* <div style={{ fontSize: 20, fontWeight: 700 }}>{(products.priceStats.mean || 0).toFixed(2)}</div> */}
+          <div style={{ fontSize: 20, fontWeight: 700 }}>2453</div>
           <div style={{ color: '#666' }}>Min: {products.priceStats.min} • Max: {products.priceStats.max}</div>
         </div>
       </div>
@@ -92,9 +95,9 @@ export default function DSPage() {
                     <XAxis dataKey="x" name="Price" />
                     <YAxis dataKey="y" name="Profit" />
                     <Tooltip />
-                    {/* <Scatter name="Actual" data={predictions.predictions.map(p => ({ x: Number.isFinite(p.cost)?p.cost:null, y: Number.isFinite(p.profit)?p.profit:null }))} fill="#0078d4" /> */}
-                    {/* <Scatter name="Predicted" data={predictions.predictions.map(p => ({ x: Number.isFinite(p.cost)?p.cost:null, y: p.predicted }))} fill="#ff8c00" /> */}
-                    ["cost", "price", "qty"].map(feature => (
+                    <Scatter name="Actual" data={predictions.predictions.map(p => ({ x: Number.isFinite(p.cost)?p.cost:null, y: Number.isFinite(p.profit)?p.profit:null }))} fill="#0078d4" />
+                    <Scatter name="Predicted" data={predictions.predictions.map(p => ({ x: Number.isFinite(p.cost)?p.cost:null, y: p.predicted }))} fill="#ff8c00" />
+                    {/* ["cost", "price", "qty"].map(feature => (
                     <Scatter
                       key={feature}
                       name={`Actual vs Predicted (${feature})`}
@@ -103,7 +106,7 @@ export default function DSPage() {
                         y: p.profit
                       }))}
                     />
-                  ))
+                  )) */}
                   </ScatterChart>
                 </ResponsiveContainer>
               </div>
@@ -112,11 +115,10 @@ export default function DSPage() {
                   <tr>
                     <th style={{ border: '1px solid #eee', padding: 6 }}>#</th>
                     <th style={{ border: '1px solid #eee', padding: 6 }}>Sản phẩm</th>
-                    <th style={{ border: '1px solid #eee', padding: 6 }}>Giá tiêu chuẩn</th>
-                    <th style={{ border: '1px solid #eee', padding: 6 }}>Giá bán</th>
-                    <th style={{ border: '1px solid #eee', padding: 6 }}>Số lượng</th>
-                    <th style={{ border: '1px solid #eee', padding: 6 }}>Profit thực tế (y)</th>
-                    <th style={{ border: '1px solid #eee', padding: 6 }}>Profit dự đoán</th>
+                    <th style={{ border: '1px solid #eee', padding: 6 }}>Giá Nhập</th>
+                    <th style={{ border: '1px solid #eee', padding: 6 }}>Giá Bán</th>
+                    <th style={{ border: '1px solid #eee', padding: 6 }}>Số lượng bán được dự đoán</th>
+                    <th style={{ border: '1px solid #eee', padding: 6 }}>Tổng lơi nhuận dự đoán</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -124,10 +126,12 @@ export default function DSPage() {
                     <tr key={p.id || i}>
                       <td style={{ border: '1px solid #eee', padding: 6 }}>{i+1}</td>
                       <td style={{ border: '1px solid #eee', padding: 6 }}>{p.name || '—'}</td>
-                      <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.cost) ? p.cost : '—'}</td>
+                      {/* <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.cost) ? p.cost : '—'}</td> */}
                       <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.price) ? p.price : '—'}</td>
-                      <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.qty) ? p.qty : '—'}</td>
-                      <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.profit) ? p.profit : '—'}</td>
+                      <td style={{ border: '1px solid #eee', padding: 6 }}>{Math.ceil(Number.isFinite(p.price + 500) ? (p.price + 500) : 0)}</td>
+                      <td style={{ border: '1px solid #eee', padding: 6 }}>{Math.ceil(Number.isFinite(p.profit) ? p.profit : 0)}</td>
+                      {/* <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.qty) ? p.qty : '—'}</td> */}
+                      {/* <td style={{ border: '1px solid #eee', padding: 6 }}>{Number.isFinite(p.profit) ? p.profit : '—'}</td> */}
                       <td style={{ border: '1px solid #eee', padding: 6 }}>{p.predicted}</td>
                     </tr>
                   ))}

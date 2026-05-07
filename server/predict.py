@@ -12,16 +12,7 @@ from sklearn.metrics import r2_score, mean_squared_error
 app = Flask(__name__)
 
 # enable CORS for localhost
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173"
-        ]
-    }
-})
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 DB_PATH = "inventory.db"
 
