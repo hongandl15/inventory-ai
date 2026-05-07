@@ -25,7 +25,7 @@ export default function DSPage() {
   // removed notebook fetches
 
 
-  
+
   // Hàm để tải dữ liệu tương quan (đã loại bỏ khỏi giao diện)
   const fetchCorrelation = () => {
     axios.get(`${API_BASE}/api/ds/correlation`).then(r => setCorr(r.data)).catch(()=>setCorr(null));
@@ -33,7 +33,7 @@ export default function DSPage() {
 
   // Hàm để chạy mô hình dự đoán lợi nhuận dựa trên giá sản phẩm
   const fetchPredictions = () => {
-    axios.get(`${API_BASE_PREDICTION}/api/ds/predict`).then(r => setPredictions(r.data)).catch(()=>setPredictions(null));
+    axios.get(`https://inventory-ai-1-iom1.onrender.com/api/ds/predict`).then(r => setPredictions(r.data)).catch(()=>setPredictions(null));
   };
 
   // Hiển thị loading nếu đang tải dữ liệu
