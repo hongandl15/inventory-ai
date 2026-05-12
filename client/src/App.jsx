@@ -65,7 +65,7 @@ function App() {
             <NavLink to="/transaction" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Nhập/Xuất</NavLink>
             <NavLink to="/report" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Báo cáo</NavLink>
             <NavLink to="/charts" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Biểu đồ</NavLink>
-            <NavLink to="/ds" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>DS Lab</NavLink>
+            {/* <NavLink to="/ds" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>DS Lab</NavLink> */}
             <NavLink to="/revenue" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Doanh thu</NavLink>
             <NavLink to="/warehouses" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Kho</NavLink>
             <NavLink to="/raw" className={({isActive})=>"nav-link" + (isActive? ' active':'')}>Dữ liệu gốc</NavLink>
