@@ -609,6 +609,8 @@ app.get('/api/transfers', async (req, res) => {
   }
 });
 
+
+
 // API: Transfer stock between warehouses
 app.post('/api/transfers', async (req, res) => {
   const { product_id, to_warehouse_id, quantity } = req.body;
@@ -683,7 +685,7 @@ app.post('/api/ai', async (req, res) => {
     }
 
     const contextParts = [];
-    const LIMIT = 100;
+    const LIMIT = 1000;
     contextParts.push(`Warehouses (${warehouses.length}):\n${warehouses.slice(0,LIMIT).map(formatRow).join('\n')}`);
     if (warehouses.length > LIMIT) contextParts.push(`...and ${warehouses.length - LIMIT} more warehouses`);
     contextParts.push(`Products (${products.length}):\n${products.slice(0,LIMIT).map(formatRow).join('\n')}`);
@@ -700,12 +702,12 @@ app.post('/api/ai', async (req, res) => {
     const userPrompt = `Câu hỏi của người dùng: ${query}\n\nContext:\n${context}\n\nVui lòng đưa ra một tóm tắt ngắn (1-2 câu) trước, sau đó nêu các chi tiết liên quan hoặc các bước thực hiện, định dạng có xuống dòng và các gạch đầu dòng nếu cần. Trả lời hoàn toàn bằng tiếng Việt.`;
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-5.4-mini-2026-03-17',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      max_tokens: 800
+      max_completion_tokens: 20000
     });
 
     const answer = response?.choices?.[0]?.message?.content || '';
